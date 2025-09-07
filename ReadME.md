@@ -24,7 +24,7 @@ Após reunir todas essas informações, eu queria que o bot registrasse os dados
 
 ## 2. Criando o bot no Telegram
 
-A primeira etapa antes de criar o Notebook foi criar o bot no Telegram. Segui o tutorial e abri uma conversa com o [@BotFather](https://t.me/BotFather), enviei/newbot` e criei a Chave de API.
+A primeira etapa antes de criar o Notebook foi criar o bot no Telegram. Segui o tutorial do repositório (que envolve enviar /newbot pro [@BotFather](https://t.me/BotFather)) e criei a Chave de API.
 
 ## 3. Preparando o ambiente no Colab
 
