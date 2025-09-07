@@ -1,6 +1,6 @@
-# Bot de Agendamento de Consultas Médicas – Relato do Estudante
+# Bot de Agendamento de Consultas Médicas via Telegram
 
-Neste documento eu compartilho, em primeira pessoa, como adaptei o bot original do projeto **MikuSec** para transformá‑lo em um assistente de agendamento de consultas em uma **clínica médica**. Além de descrever cada decisão que tomei, também explico de maneira informal o que é uma **ontologia** e como utilizei a biblioteca owlready2 para modelar os dados dos pacientes.
+Neste ReadME, explico como criei um Bot de Agendamento de Consultas Médicas via Telegram adaptando o código do repositório sugerido no enunciado da Ponderada de Programação da Semana 05 (https://github.com/vthayashi/mikusec).
 
 ## 1. Motivação e visão geral
 
@@ -94,22 +94,10 @@ onto.save(file='clinic.owl')
 (Copiado do Código do Notebook)
 Em seguida, o bot manda uma mensagem de agradecimento utilizando as informações guardadas e define o estado como -1 para marcar que aquele usuário já concluiu a coleta.
 
-## 5. Loop principal e testes
+## 5. Polling x Webhooks
 
-No final do notebook, escrevi um laço infinito que consulta a API do Telegram a cada segundo por meio da função getUpdates e passa as mensagens novas para process_updates. Durante meus testes, percebi que esse método de _long polling_ funciona bem para bots simples; porém, para aplicações em produção, talvez seja melhor configurar _webhooks_.
+No final do notebook, escrevi um LOOP que consulta a API do Telegram a cada segundo por meio da função getUpdates e passa as mensagens novas para process_updates. 
+Assim, utilizamos polling para manter o bot ativo e respondendo (apesar de que Webhooks seriam uma melhor abordagem).
 
-Testei o bot conversando com ele no Telegram. Cada pergunta foi enviada no momento certo, e as respostas foram corretamente armazenadas no dicionário e na ontologia. Ao final, recebi uma mensagem de resumo com os dados que informei.
-
-## 6. Reflexões e considerações finais
-
-·       **Ontologias**: Apesar de simples, gostei de usar ontologias para armazenar dados. Elas ajudam a manter a estrutura clara e podem ser ampliadas no futuro (por exemplo, para incluir informações sobre médicos ou horários de consulta).
-
-·       **Privacidade**: Ao lidar com dados sensíveis como CPF e RG, pensei que seria importante mencionar que este código é didático. Em um ambiente real, é necessário proteger esses dados e cumprir a LGPD.
-
-·       **Validação de dados**: No protótipo, não implementei validação (por exemplo, verificar se um CPF possui 11 dígitos). Se o bot for usado de verdade, eu consideraria adicionar essas verificações.
-
-·       **Experiência**: Desenvolver esse bot me ensinou a importância de planejar o fluxo de conversa e de usar estruturas de dados apropriadas (como dicionários de estado) para controlar interações assíncronas.
-
-Concluindo, adaptar o MikuSec para a clínica foi uma experiência interessante. Utilizei o Telegram Bot API, aprendi sobre ontologias com owlready2 e criei um fluxograma de coleta de informações que pode servir de base para sistemas de atendimento mais complexos no futuro.
 
 ---
