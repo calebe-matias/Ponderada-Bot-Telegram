@@ -1,50 +1,46 @@
-# Bot de Agendamento de Consultas Médicas – Documentação
+# Bot de Agendamento de Consultas Médicas – Relato do Estudante
 
-Esta documentação explica passo a passo como adaptar o bot original do projeto **MikuSec** para que ele funcione como assistente de uma **clínica médica**, coletando dados de pacientes que desejam agendar consultas. O documento também apresenta de forma acessível o conceito de **ontologia** usado no código e como ela é construída com a biblioteca owlready2.
+Neste documento eu compartilho, em primeira pessoa, como adaptei o bot original do projeto **MikuSec** para transformá‑lo em um assistente de agendamento de consultas em uma **clínica médica**. Além de descrever cada decisão que tomei, também explico de maneira informal o que é uma **ontologia** e como utilizei a biblioteca owlready2 para modelar os dados dos pacientes.
 
-## 1. Visão geral
+## 1. Motivação e visão geral
 
-O bot conversa com o paciente pelo Telegram e solicita, de forma sequencial, os seguintes dados:
+Quando comecei este trabalho, percebi que o código do MikuSec estava voltado para perguntas sobre blockchain. Minha meta era reaproveitar a estrutura básica do bot (conexão com a API do Telegram e lógica de estados) para criar um assistente que coletasse informações de pacientes.
 
-·       **Nome completo**
+Decidi que o bot deveria solicitar, em ordem, os seguintes dados:
 
-·       **Data de nascimento**
+·       Nome completo
 
-·       **CPF**
+·       Data de nascimento
 
-·       **RG**
+·       CPF
 
-·       **Endereço**
+·       RG
 
-·       **Nome do plano de saúde**
+·       Endereço
 
-Após coletar essas informações, o bot registra os dados em uma ontologia (arquivo clinic.owl) e responde com um resumo, indicando que a clínica entrará em contato para confirmar a consulta.
+·       Plano de saúde
 
-## 2. Criação do bot no Telegram
+Após reunir todas essas informações, eu queria que o bot registrasse os dados em uma estrutura organizada (a ontologia) e enviasse uma mensagem de confirmação ao paciente.
 
-1.       No Telegram, inicie uma conversa com o usuário [@BotFather](https://t.me/BotFather).
+## 2. Criando o bot no Telegram
 
-2.       Envie o comando /newbot e siga as instruções: escolha um **nome** (ex.: ClinicaBot) e um **username** (terminado em bot).
+Antes de escrever qualquer código, foi preciso criar um bot real no Telegram. Para isso, abri uma conversa com [@BotFather](https://t.me/BotFather), enviei/newbot` e segui as instruções para escolher um nome e um username para o bot. Ao final, o BotFather me deu um **token** (uma longa string de caracteres) que identifica meu bot na API. Guardei esse token cuidadosamente porque ele é usado em todas as requisições.
 
-3.       O BotFather retornará um **token**, uma sequência como 123456789:ABCDE.... **Copie e guarde esse token**, pois ele será usado para autenticar o seu bot na API do Telegram.
+## 3. Preparando o ambiente no Colab
 
-## 3. Preparação do ambiente
+### 3.1 Instalando dependências
 
-### 3.1 Instalação de dependências
-
-No Google Colab, abra o notebook bot_clinica_colab.ipynb e execute a primeira célula de código. Ela instala a biblioteca owlready2, que é usada para manipular ontologias em Python.
+Escolhi desenvolver e testar o bot no Google Colab porque é um ambiente online fácil de usar. A primeira decisão foi instalar a biblioteca owlready2, que me permite criar e manipular ontologias em Python. Usei o comando:
 
 !pip -q install owlready2
 
-### 3.2 Definição da ontologia
+### 3.2 Definindo a ontologia dos pacientes
 
-Uma **ontologia** é um modelo estruturado que representa conceitos e relacionamentos de um determinado domínio. No contexto deste bot, a ontologia é usada para representar **pacientes** e os atributos associados a eles (nome, data de nascimento, CPF etc.). Utilizamos a biblioteca owlready2 para criar, manipular e salvar essa ontologia.
+Como eu queria guardar os dados do paciente de forma estruturada, decidi criar uma ontologia chamada **clinic.owl**. Uma ontologia, na prática, é um modelo formal que define _classes_ (tipos de objetos) e _propriedades_ (atributos e relações) de um domínio específico. Achei que seria interessante usar ontologias porque elas facilitam a integração de dados e a verificação de consistência.
 
-No notebook há uma célula que define a ontologia clinic.owl da seguinte forma:
+Utilizando owlready2, criei uma classe Paciente e algumas propriedades de dados (nome, dataNascimento, cpf, rg, endereco e planoSaude) ligadas a essa classe. Na célula do notebook, o código ficou assim:
 
 from owlready2 import *  
-  
-# Cria ou carrega uma ontologia simples  
 onto = get_ontology("http://example.org/clinic.owl")  
   
 with onto:  
@@ -53,97 +49,63 @@ with onto:
     class nome(DataProperty):  
         domain = [Paciente]  
         range = [str]  
-    class dataNascimento(DataProperty):  
-        domain = [Paciente]  
-        range = [str]  
-    class cpf(DataProperty):  
-        domain = [Paciente]  
-        range = [str]  
-    # ... outras propriedades (rg, endereco, planoSaude)  
+    # ... definição das outras propriedades ...  
   
 onto.save(file="clinic.owl")
 
-·       Paciente é uma **classe** (tipo de objeto) que representa cada paciente.
+Ao salvar a ontologia em arquivo, eu pude reutilizá‑la para criar instâncias de pacientes conforme o bot fosse coletando dados.
 
-·       nome, dataNascimento, cpf, rg, endereco e planoSaude são **propriedades de dados** (DataProperty) associadas à classe Paciente. Elas indicam que um paciente possui um nome (texto), data de nascimento etc. O atributo domain=[Paciente] indica que a propriedade está ligada à classe Paciente, e range=[str] especifica que o valor deve ser uma string.
+### 3.3 Configurando o token e estruturas de dados
 
-·       Ao final, a ontologia é salva em um arquivo clinic.owl, permitindo reutilização futura.
+Na sequência, importei as bibliotecas padrão (json, requests, time, urllib), carreguei a ontologia e defini o meu TOKEN com a string fornecida pelo BotFather. Se o token estiver vazio, o código lança um erro – isso evita que eu esqueça de configurá‑lo.
 
-Essa ontologia é muito simples, mas ilustra a ideia de modelar informações de forma estruturada e reutilizável.
+Também decidi usar dois dicionários:
 
-### 3.3 Configuração do token
+·       estado: associa cada chat do Telegram a um número que representa em qual etapa do diálogo o usuário está.
 
-Na célula de configuração do notebook, você deve importar as bibliotecas necessárias, carregar a ontologia salva (clinic.owl) e definir o token do seu bot:
+·       paciente_info: armazena temporariamente as respostas de cada usuário até todas as informações serem coletadas.
 
-from owlready2 import get_ontology  
-onto = get_ontology("clinic.owl").load()  
-  
-TOKEN = 'SEU_TOKEN_AQUI'  # substitua pelo token obtido com o BotFather
+## 4. Construindo a lógica da conversa
 
-A variável URL é montada a partir do token para formar o endereço base das requisições à API do Telegram (ex.: https://api.telegram.org/bot<SEU_TOKEN>/). Dois dicionários são inicializados:
+Baseei a lógica do bot em uma **máquina de estados**. Cada número de estado corresponde a uma pergunta ou ação. Quando o bot recebe uma nova mensagem, ele verifica qual estado o usuário está e decide o que fazer. Resumidamente, meus estados ficaram assim:
 
-·       **estado**: guarda, para cada usuário, em qual etapa do diálogo (passo) ele se encontra.
-
-·       **paciente_info**: armazena temporariamente as respostas coletadas de cada usuário.
-
-## 4. Lógica da conversa (fluxo de estados)
-
-O bot funciona como uma **máquina de estados**. A cada mensagem enviada pelo usuário, o bot consulta o valor atual de estado[chat_id] e determina qual pergunta fazer ou qual campo deve receber a resposta. O fluxo principal está implementado na função process_updates:
-
-|Estado|Ação do bot|Próximo estado|
+|Estado|O que eu faço|Próximo estado|
 |---|---|---|
-|**0**|Saudações. Pergunta o nome completo.|1|
-|**1**|Armazena o nome e pergunta a data de nascimento.|2|
-|**2**|Armazena a data de nascimento e pergunta o CPF.|3|
-|**3**|Armazena o CPF e pergunta o RG.|4|
-|**4**|Armazena o RG e pergunta o endereço completo.|5|
-|**5**|Armazena o endereço e pergunta o plano de saúde.|6|
-|**6**|Armazena o plano de saúde, cria um indivíduo Paciente na ontologia com todos os dados, salva a ontologia em clinic.owl e envia um resumo ao usuário.|-1|
-|**-1**|Informa que os dados já foram registrados e encerra a conversa (aguarda novas interações).|-1|
+|**0**|Saúdo o usuário e pergunto o nome.|1|
+|**1**|Guardo o nome e pergunto a data de nascimento.|2|
+|**2**|Guardo a data e pergunto o CPF.|3|
+|**3**|Guardo o CPF e pergunto o RG.|4|
+|**4**|Guardo o RG e pergunto o endereço.|5|
+|**5**|Guardo o endereço e pergunto o plano de saúde.|6|
+|**6**|Guardo o plano, crio um indivíduo Paciente na ontologia com todas as informações e envio o resumo.|-1|
+|**-1**|Informo que os dados já foram registrados e encerro a conversa.|-1|
 
-### 4.1 Como os dados são armazenados
-
-Quando o bot chega ao passo **6**, ele cria um novo indivíduo da classe Paciente na ontologia:
+Decidi que, após o estado **6**, o bot criaria um novo objeto Paciente na ontologia e populasse cada propriedade com os dados coletados. Usei um contexto with onto: para garantir que o indivíduo fosse criado no ambiente da ontologia:
 
 with onto:    p = Paciente()  
     p.nome = [paciente_info[chat_id]['nome']]  
     p.dataNascimento = [paciente_info[chat_id]['dataNascimento']]  
-    p.cpf = [paciente_info[chat_id]['cpf']]  
-    p.rg = [paciente_info[chat_id]['rg']]  
-    p.endereco = [paciente_info[chat_id]['endereco']]  
-    p.planoSaude = [paciente_info[chat_id]['planoSaude']]  
+    # ... e assim por diante ...  
 onto.save(file='clinic.owl')
 
-Cada chamada como p.nome = [...] associa o valor coletado à propriedade nome do paciente criado. Depois, onto.save(...) atualiza o arquivo clinic.owl para que os dados sejam persistidos.
+Em seguida, montei uma mensagem de agradecimento utilizando as informações guardadas e defini o estado como -1 para marcar que aquele usuário já concluiu a coleta.
 
-### 4.2 Mensagem de confirmação
+## 5. Loop principal e testes
 
-Após registrar o paciente, o bot monta uma mensagem de resumo utilizando os dados armazenados no dicionário paciente_info[chat_id] e envia ao usuário, agradecendo e avisando que a clínica entrará em contato. O estado do usuário é definido como -1 para indicar que a coleta terminou.
+No final do notebook, escrevi um laço infinito que consulta a API do Telegram a cada segundo por meio da função getUpdates e passa as mensagens novas para process_updates. Durante meus testes, percebi que esse método de _long polling_ funciona bem para bots simples; porém, para aplicações em produção, talvez seja melhor configurar _webhooks_.
 
-## 5. Loop principal
+Testei o bot conversando com ele no Telegram. Cada pergunta foi enviada no momento certo, e as respostas foram corretamente armazenadas no dicionário e na ontologia. Ao final, recebi uma mensagem de resumo com os dados que informei.
 
-A última célula do notebook inicia um laço infinito que consulta a API do Telegram a cada segundo através da função get_updates. Se existirem novas mensagens (updates['result']), o offset é atualizado para não reprocessar mensagens antigas e a função process_updates é chamada para tratar cada uma. Esse laço mantém o bot ativo enquanto a célula estiver sendo executada.
+## 6. Reflexões e considerações finais
 
-## 6. Considerações finais
+·       **Ontologias**: Apesar de simples, gostei de usar ontologias para armazenar dados. Elas ajudam a manter a estrutura clara e podem ser ampliadas no futuro (por exemplo, para incluir informações sobre médicos ou horários de consulta).
 
-·       **Privacidade:** O bot coleta dados sensíveis (CPF, RG). Em um cenário real, essas informações devem ser armazenadas de forma segura (criptografia, acesso restrito etc.). O exemplo aqui tem fins educacionais.
+·       **Privacidade**: Ao lidar com dados sensíveis como CPF e RG, pensei que seria importante mencionar que este código é didático. Em um ambiente real, é necessário proteger esses dados e cumprir a LGPD.
 
-·       **Validação:** O código apresentado não valida os formatos de CPF, datas ou outros campos. Para uso profissional, implemente validação de dados e tratamento de erros.
+·       **Validação de dados**: No protótipo, não implementei validação (por exemplo, verificar se um CPF possui 11 dígitos). Se o bot for usado de verdade, eu consideraria adicionar essas verificações.
 
-·       **Escalabilidade:** A abordagem utiliza _long polling_ para ler mensagens. Para maior escalabilidade, considere usar _webhooks_ e frameworks dedicados (por exemplo, python-telegram-bot).
+·       **Experiência**: Desenvolver esse bot me ensinou a importância de planejar o fluxo de conversa e de usar estruturas de dados apropriadas (como dicionários de estado) para controlar interações assíncronas.
 
-·       **Ontologia:** Mesmo sendo simples, a ontologia clinic.owl permite armazenar e consultar pacientes de forma estruturada. Em projetos maiores, ontologias podem representar relações complexas (consultas, médicos, convênios, horários, etc.), facilitando a integração de sistemas e a consistência de dados.
-
-## 7. Como experimentar
-
-1.       **Configure o bot e o token.**
-
-2.       **Execute o notebook no Google Colab.**
-
-3.       **Converse com o seu bot no Telegram.** Ele fará as perguntas na ordem indicada e registrará suas respostas.
-
-4.       **Verifique o arquivo** **clinic.owl**. Faça download ou abra no Colab para ver as instâncias criadas; use owlready2 para inspecionar as propriedades dos pacientes.
-
-Seguindo estes passos e entendendo a lógica de estados e da ontologia, você poderá adaptar o bot para outras aplicações ou expandir o modelo de dados da clínica.
+Concluindo, adaptar o MikuSec para a clínica foi uma experiência interessante. Utilizei o Telegram Bot API, aprendi sobre ontologias com owlready2 e criei um fluxograma de coleta de informações que pode servir de base para sistemas de atendimento mais complexos no futuro.
 
 ---
