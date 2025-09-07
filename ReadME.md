@@ -72,7 +72,8 @@ Também usamos dois dicionários (Lógica que peguei de uma mistura entre ChatGP
 
 A lógica do bot é baseada em uma **máquina de estados**. Cada número de estado corresponde a uma pergunta ou ação. Quando o bot recebe uma nova mensagem, ele verifica qual estado o usuário está e decide o que fazer. Os dados ficam classificados assim:
 
-|Estado|O que eu faço|Próximo estado|
+### Tabela de Estados do Bot:
+|Estado|O que o código/bot faz |Próximo estado|
 |---|---|---|
 |**0**|Saúdo o usuário e pergunto o nome.|1|
 |**1**|Guardo o nome e pergunto a data de nascimento.|2|
@@ -92,7 +93,7 @@ with onto:    p = Paciente()
 onto.save(file='clinic.owl')
 ```
 (Copiado do Código do Notebook)
-Em seguida, o bot manda uma mensagem de agradecimento utilizando as informações guardadas e define o estado como -1 para marcar que aquele usuário já concluiu a coleta.
+No final, o bot manda uma mensagem de agradecimento utilizando as informações guardadas e define o estado como -1 para marcar que aquele usuário já concluiu a coleta.
 
 ## 5. Polling x Webhooks
 
